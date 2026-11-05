@@ -4,7 +4,6 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuri
 
 **Requires Godot 4.7+**
 
-[![Godot Asset Library](https://img.shields.io/badge/Godot%20Asset%20Library-PixelRope-478CBF?style=for-the-badge&logo=godotengine&logoColor=white)](https://godotengine.org/asset-library/asset)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Y7caBf7gBj)
 
 <p align="center">
