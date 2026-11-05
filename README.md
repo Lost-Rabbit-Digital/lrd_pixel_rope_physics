@@ -1,8 +1,8 @@
 # PixelRope
 
-A high-performance, pixel-perfect rope simulation plugin for Godot 4.4, featuring realistic physics, customizable rendering, and interactive anchors.
+A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuring realistic physics, customizable rendering, and interactive anchors.
 
-**Requires Godot 4.4+**
+**Requires Godot 4.7+**
 
 [![Godot Asset Library](https://img.shields.io/badge/Godot%20Asset%20Library-PixelRope-478CBF?style=for-the-badge&logo=godotengine&logoColor=white)](https://godotengine.org/asset-library/asset)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Y7caBf7gBj)
@@ -114,3 +114,9 @@ Made by [Lost Rabbit Digital](https://github.com/Lost-Rabbit-Digital) · [Discor
 - **Elastic System** - [@brinegame.bsky.social](https://bsky.app/profile/brinegame.bsky.social/post/3ljgyh6d5lc2x)
 
 MPL-2.0 — see [LICENSE](LICENSE.md)
+
+---
+
+## AI Disclosure
+
+Parts of this project, including code and documentation, were written with the help of AI tools (such as Claude). All AI-assisted work has been reviewed and tested by a human before release.
