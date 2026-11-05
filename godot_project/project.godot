@@ -10,15 +10,15 @@ config_version=5
 
 [application]
 
-config/name="Pixel Ropes"
-config/tags=PackedStringArray("active", "open_sourced", "plugin", "utility")
+config/name="lrd_pixel_rope_physics"
+config/tags=PackedStringArray("active", "open_sourced")
 run/main_scene="uid://3xv28xdk5fcv"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="uid://c0qbemtbf1136"
 
 [autoload]
 
-PauseMenu="*res://addons/pixel_rope/scripts/ui/pause_menu.gd"
+PauseMenu="*res://addons/lrd_pixel_rope_physics/scripts/ui/pause_menu.gd"
 
 [display]
 
