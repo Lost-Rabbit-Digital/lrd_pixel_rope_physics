@@ -18,7 +18,7 @@ config/icon="uid://c0qbemtbf1136"
 
 [autoload]
 
-PauseMenu="*res://addons/lrd_pixel_rope_physics/scripts/ui/pause_menu.gd"
+PauseMenu="*res://addons/lrd_pixel_rope_physics/examples/demo_menu.gd"
 
 [display]
 
@@ -28,7 +28,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/pixel_rope/plugin.cfg")
+enabled=PackedStringArray("res://addons/lrd_pixel_rope_physics/plugin.cfg")
 
 [rendering]
 
