@@ -25,7 +25,7 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuri
 
 ## Install
 
-1. Copy `addons/pixel_rope/` into your project:
+1. Copy `addons/lrd_pixel_rope_physics/` into your project:
    ```
    your_project/
    └── addons/
@@ -41,7 +41,7 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuri
    ```
 2. **Project → Project Settings → Plugins** → enable **LRD Pixel Rope Physics**
 
-> Upgrading from 2.x: the folder moved from `addons/pixel_rope/` to `addons/lrd_pixel_rope_physics/` and the scripts now sit at its root (`scripts/components/rope_node.gd` is now `pixel_rope.gd`). Delete the old folder, copy in the new one, and re-enable the plugin. Scenes find the scripts again by UID.
+> Upgrading from 2.x: the folder moved from `addons/lrd_pixel_rope_physics/` to `addons/lrd_pixel_rope_physics/` and the scripts now sit at its root (`scripts/components/rope_node.gd` is now `pixel_rope.gd`). Delete the old folder, copy in the new one, and re-enable the plugin. Scenes find the scripts again by UID.
 
 ---
 

@@ -44,6 +44,7 @@ These properties control how the rope is rendered at the pixel level:
 |----------|------|---------|-------------|
 | `pixel_size` | int | 4 | Size of each rendered pixel. Higher values create a more "chunky" pixelated look. |
 | `pixel_spacing` | int | 0 | Spacing between pixels (0 = solid line, higher values create a dotted effect). |
+| `pixel_perfect` | bool | true | Removes L-shaped corner pixels (like Aseprite's Pixel Perfect mode) for a clean 1-pixel stroke. |
 | `line_algorithm` | LineAlgorithmType | BRESENHAM | Algorithm used for drawing pixel lines. BRESENHAM is faster, DDA looks smoother on diagonals. |
 
 Example:
@@ -61,8 +62,9 @@ These properties control how the rope moves and responds to forces:
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `gravity` | Vector2 | Vector2(0, 980) | Force applied to rope segments. Default is standard downward gravity. |
-| `damping` | float | 0.98 | Velocity dampening (0-1). Higher values make the rope less bouncy/more rigid. |
-| `iterations` | int | 10 | Physics iteration count for stability. Higher values increase stability but cost CPU. |
+| `damping` | float | 0.98 | Fraction of velocity kept every 1/60 s (0-1). Frame-rate and substep independent. Lower values settle faster. |
+| `iterations` | int | 1 | Constraint passes per substep. Keep at 1 and raise `physics_substeps` instead. |
+| `physics_substeps` | int | 20 | Substeps per physics frame. More substeps give a stiffer, less stretchy rope (cost scales linearly). |
 | `max_stretch_factor` | float | 2.0 | Maximum stretch before rope breaks (as a multiplier of normal length). |
 
 Example:
@@ -366,10 +368,10 @@ func apply_rope_config(rope, config: Dictionary) -> void:
 
 If your rope isn't behaving as expected, check these common configuration issues:
 
-1. **Rope is too stretchy**: Increase `iterations` and/or decrease `max_stretch_factor`
-2. **Rope is unstable/jittery**: Increase `iterations` and/or `damping`
+1. **Rope is too stretchy**: Increase `physics_substeps` and/or decrease `max_stretch_factor`
+2. **Rope is unstable/jittery**: Increase `physics_substeps` and/or `damping`
 3. **Rope doesn't collide properly**: Check `collision_mask` matches your environment layers
-4. **Rope is too rigid**: Decrease `iterations` and/or increase `damping`
+4. **Rope is too rigid**: Decrease `physics_substeps` and/or increase `damping`
 5. **Anchors behave strangely**: Try adjusting `anchor_mass` or disable `dynamic_start_anchor`/`dynamic_end_anchor`
 
 For more specific troubleshooting, see the [Troubleshooting](troubleshooting.md) guide.

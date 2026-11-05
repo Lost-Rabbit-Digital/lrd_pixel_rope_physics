@@ -36,6 +36,7 @@ This document provides a complete reference for all classes, properties, methods
 |----------|------|---------|-------------|
 | `pixel_size` | int | 4 | Size of each rendered pixel |
 | `pixel_spacing` | int | 0 | Spacing between pixels (0 = solid line) |
+| `pixel_perfect` | bool | true | Removes L-shaped corner pixels for a clean 1-pixel stroke |
 | `line_algorithm` | LineAlgorithmType | BRESENHAM | Algorithm used for drawing lines |
 
 #### Physics Properties
@@ -43,8 +44,9 @@ This document provides a complete reference for all classes, properties, methods
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `gravity` | Vector2 | Vector2(0, 980) | Force applied to rope segments |
-| `damping` | float | 0.98 | Velocity dampening (0-1) |
-| `iterations` | int | 10 | Physics iteration count for stability |
+| `damping` | float | 0.98 | Fraction of velocity kept every 1/60 s (frame-rate independent) |
+| `iterations` | int | 1 | Constraint passes per substep. Prefer raising `physics_substeps` |
+| `physics_substeps` | int | 20 | Substeps per physics frame. More = stiffer, less stretchy rope |
 | `max_stretch_factor` | float | 2.0 | Maximum stretch before rope breaks |
 
 #### Anchor Properties

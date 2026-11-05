@@ -71,6 +71,93 @@ static func _bresenham_line(from: Vector2, to: Vector2, pixel_size: int, spacing
 	return points
 
 
+## Rasterizes a whole polyline into one continuous path of grid cells.
+##
+## Points are snapped to a grid of [param pixel_size] in the space they are
+## given in (pass global positions so the grid stays fixed in the world).
+## Consecutive duplicate cells are dropped, so joints between segments are
+## never emitted twice. When [param pixel_perfect] is true, L-shaped corners
+## are removed (the same cleanup as Aseprite's "Pixel Perfect" freehand mode),
+## leaving a clean 1-pixel stroke. Results are written into [param out]
+## (cleared first) to avoid per-frame allocations.
+static func rasterize_path(
+	points: PackedVector2Array,
+	pixel_size: int,
+	algorithm_type: LineAlgorithmType,
+	pixel_perfect: bool,
+	out: PackedVector2Array
+) -> void:
+	out.clear()
+	if points.is_empty():
+		return
+
+	var ps := float(maxi(pixel_size, 1))
+	var prev := Vector2i((points[0] / ps).floor())
+	_push_cell(out, prev, pixel_perfect)
+
+	for i in range(1, points.size()):
+		var cell := Vector2i((points[i] / ps).floor())
+		if cell == prev:
+			continue
+		if algorithm_type == LineAlgorithmType.DDA:
+			_walk_dda(prev, cell, out, pixel_perfect)
+		else:
+			_walk_bresenham(prev, cell, out, pixel_perfect)
+		prev = cell
+
+
+## Appends a cell, skipping duplicates and (optionally) removing L-corners.
+## A corner is the middle of three cells where the outer two touch diagonally,
+## e.g. (0,0) (1,0) (1,1): the (1,0) cell is redundant for an 8-connected line.
+static func _push_cell(out: PackedVector2Array, cell: Vector2i, pixel_perfect: bool) -> void:
+	var c := Vector2(cell)
+	var n := out.size()
+	if n > 0 and out[n - 1] == c:
+		return
+	if pixel_perfect and n >= 2:
+		var a := out[n - 2]
+		if absf(a.x - c.x) == 1.0 and absf(a.y - c.y) == 1.0:
+			out[n - 1] = c
+			return
+		if a == c:
+			# Path doubled back on itself: drop the spike.
+			out.resize(n - 1)
+			return
+	out.append(c)
+
+
+## Bresenham walk between two cells, excluding the start cell.
+static func _walk_bresenham(from: Vector2i, to: Vector2i, out: PackedVector2Array, pixel_perfect: bool) -> void:
+	var x0 := from.x
+	var y0 := from.y
+	var dx := absi(to.x - x0)
+	var dy := -absi(to.y - y0)
+	var sx := 1 if x0 < to.x else -1
+	var sy := 1 if y0 < to.y else -1
+	var err := dx + dy
+
+	while x0 != to.x or y0 != to.y:
+		var e2 := 2 * err
+		if e2 >= dy:
+			err += dy
+			x0 += sx
+		if e2 <= dx:
+			err += dx
+			y0 += sy
+		_push_cell(out, Vector2i(x0, y0), pixel_perfect)
+
+
+## DDA walk between two cells, excluding the start cell.
+static func _walk_dda(from: Vector2i, to: Vector2i, out: PackedVector2Array, pixel_perfect: bool) -> void:
+	var d := Vector2(to - from)
+	var steps := int(maxf(absf(d.x), absf(d.y)))
+	var inc := d / float(steps)
+	var p := Vector2(from)
+	for _i in steps:
+		p += inc
+		_push_cell(out, Vector2i(p.round()), pixel_perfect)
+
+
 static func _dda_line(from: Vector2, to: Vector2, pixel_size: int, spacing: int = 0) -> Array[Vector2]:
 	var points: Array[Vector2] = []
 
