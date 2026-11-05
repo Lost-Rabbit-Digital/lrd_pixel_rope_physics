@@ -1,19 +1,25 @@
 @tool
-@icon("res://addons/pixel_rope/icons/Curve2D.svg")
-## Pixel-perfect rope simulation using Verlet integration.
-##
-## Verlet integration is the optimal algorithm for rope/chain simulation:
-## it's numerically stable, preserves energy well, and naturally handles
-## constraints through iterative position correction. Each frame:
-## 1. Integrate positions using velocity = current_pos - old_pos (implicit)
-## 2. Apply gravity and damping
-## 3. Iteratively solve distance constraints between adjacent points
-## 4. Resolve collisions with environment
-extends Node2D
+@icon("res://addons/lrd_pixel_rope_physics/icons/Curve2D.svg")
 class_name PixelRope
+extends Node2D
+## A pixel-perfect rope between two [code]RopeAnchor[/code] children, [code]StartAnchor[/code]
+## and [code]EndAnchor[/code], which it makes if they're missing.
+##
+## The rope is simulated with Verlet integration: stable, cheap, and it handles the length
+## constraints by nudging points back into place. Each physics substep:
+## [br]1. Moves each point by its implicit velocity ([code]position - old_position[/code]),
+## damped, plus gravity.
+## [br]2. Pulls neighbouring points back to [member segment_length] apart,
+## [member iterations] times (more is stiffer).
+## [br]3. Pushes points out of colliders on [member collision_mask].
+## [br]It's drawn as square pixels along Bresenham or DDA lines between the points.
 
+## Emitted when the rope stretches past [member max_stretch_factor] or [method break_rope] is
+## called.
 signal rope_broken
+## Emitted when the player grabs the rope at point [param segment_index].
 signal rope_grabbed(segment_index: int)
+## Emitted when the player lets go of a grabbed point.
 signal rope_released
 
 enum RopeState { NORMAL, STRETCHED, BROKEN }
@@ -167,7 +173,7 @@ func _ready() -> void:
 	_initialized = true
 
 	if enable_collisions:
-		call_deferred("_init_collisions")
+		_init_collisions.call_deferred()
 
 
 func _notification(what: int) -> void:
@@ -523,7 +529,7 @@ func reset_rope() -> void:
 	_init_rope()
 
 
-func get_state() -> int:
+func get_state() -> RopeState:
 	return _state
 
 

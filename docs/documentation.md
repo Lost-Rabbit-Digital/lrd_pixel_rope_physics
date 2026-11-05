@@ -1,6 +1,6 @@
 # PixelRope Documentation
 
-![PixelRope Banner](https://img.shields.io/badge/Godot-4.4-blue) ![License](https://img.shields.io/badge/license-MPL--2.0-green) ![Version](https://img.shields.io/badge/version-1.0.0-orange)
+![PixelRope Banner](https://img.shields.io/badge/Godot-4.4-blue) ![License](https://img.shields.io/badge/license-MPL--2.0-green) ![Version](https://img.shields.io/badge/version-3.0.0-orange)
 
 ## Table of Contents
 
@@ -85,4 +85,4 @@ Thank you to those who requested features, pointed out bugs, and helped to motiv
 - **Collision System** - [@atropos148.bsky.social](https://bsky.app/profile/atropos148.bsky.social/post/3ljhccxiiyc2g)
 - **Elastic System** - [@brinegame.bsky.social](https://bsky.app/profile/brinegame.bsky.social/post/3ljgyh6d5lc2x)
 
-For more information, see [attributions.md](../information/ATTRIBUTIONS.md).
+For more information, see the Credits section of the [README](../README.md#credits).
