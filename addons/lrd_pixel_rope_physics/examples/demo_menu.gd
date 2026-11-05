@@ -1,15 +1,15 @@
 extends CanvasLayer
-## Pause menu overlay that can be toggled with Escape or P.
-## Registered as an autoload so it works across all demo scenes.
+## Pause menu for the example scenes: Escape or P opens it, to resume, restart or jump to another
+## example. Autoloaded as [code]PauseMenu[/code] by this repo's demo project only, not by the plugin.
 
 const DEMO_SCENES: Array[Dictionary] = [
-	{"name": "Basic Ropes", "path": "res://addons/pixel_rope/examples/basic_ropes/basic_rope_demo.tscn"},
-	{"name": "Dynamic Bridge", "path": "res://addons/pixel_rope/examples/dynamic_bridge/dynamic_bridge_demo.tscn"},
-	{"name": "Dynamic Lights", "path": "res://addons/pixel_rope/examples/dynamic_lights/dynamic_lights_demo.tscn"},
-	{"name": "Grappling Hook", "path": "res://addons/pixel_rope/examples/grappling_hook/grappling_hook_demo.tscn"},
-	{"name": "Pulley System", "path": "res://addons/pixel_rope/examples/pulley_interaction/puley_demo.tscn"},
-	{"name": "Technical Playground", "path": "res://addons/pixel_rope/examples/technical_playground/playground_demo.tscn"},
-	{"name": "Towing & Winching", "path": "res://addons/pixel_rope/examples/towing_and_winching/towing_and_winching_demo.tscn"},
+	{"name": "Basic Ropes", "path": "res://addons/lrd_pixel_rope_physics/examples/basic_ropes/basic_rope_demo.tscn"},
+	{"name": "Dynamic Bridge", "path": "res://addons/lrd_pixel_rope_physics/examples/dynamic_bridge/dynamic_bridge_demo.tscn"},
+	{"name": "Dynamic Lights", "path": "res://addons/lrd_pixel_rope_physics/examples/dynamic_lights/dynamic_lights_demo.tscn"},
+	{"name": "Grappling Hook", "path": "res://addons/lrd_pixel_rope_physics/examples/grappling_hook/grappling_hook_demo.tscn"},
+	{"name": "Pulley System", "path": "res://addons/lrd_pixel_rope_physics/examples/pulley_interaction/puley_demo.tscn"},
+	{"name": "Technical Playground", "path": "res://addons/lrd_pixel_rope_physics/examples/technical_playground/playground_demo.tscn"},
+	{"name": "Towing & Winching", "path": "res://addons/lrd_pixel_rope_physics/examples/towing_and_winching/towing_and_winching_demo.tscn"},
 ]
 
 var _panel: Control

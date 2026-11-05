@@ -1,10 +1,9 @@
 # PixelRope
 
-A high-performance, pixel-perfect rope simulation plugin for Godot 4.4, featuring realistic physics, customizable rendering, and interactive anchors.
+A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuring realistic physics, customizable rendering, and interactive anchors.
 
-**Requires Godot 4.4+**
+**Requires Godot 4.7+**
 
-[![Godot Asset Library](https://img.shields.io/badge/Godot%20Asset%20Library-PixelRope-478CBF?style=for-the-badge&logo=godotengine&logoColor=white)](https://godotengine.org/asset-library/asset)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Y7caBf7gBj)
 
 <p align="center">
@@ -26,25 +25,29 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.4, featurin
 
 ## Install
 
-### Asset Library (recommended)
-
-1. Open your project → **AssetLib** → search **"PixelRope"**
-2. **Download** → **Install**
-3. **Project → Project Settings → Plugins** → enable **PixelRope**
-
-### Manual
-
 1. Copy `addons/pixel_rope/` into your project:
    ```
    your_project/
    └── addons/
-       └── pixel_rope/
+       └── lrd_pixel_rope_physics/
+           ├── plugin.cfg
+           ├── plugin.gd
+           ├── pixel_rope.gd
+           ├── rope_anchor.gd
+           ├── line_algorithms.gd
+           ├── rope_creation_tool.gd
+           ├── icons/
+           └── examples/
    ```
-2. **Project → Project Settings → Plugins** → enable **PixelRope**
+2. **Project → Project Settings → Plugins** → enable **LRD Pixel Rope Physics**
+
+> Upgrading from 2.x: the folder moved from `addons/pixel_rope/` to `addons/lrd_pixel_rope_physics/` and the scripts now sit at its root (`scripts/components/rope_node.gd` is now `pixel_rope.gd`). Delete the old folder, copy in the new one, and re-enable the plugin. Scenes find the scripts again by UID.
 
 ---
 
 ## Usage
+
+Add a **PixelRope** node from the Add Node dialog, or turn on the rope button in the 2D editor toolbar and click and drag in the 2D view to draw one (Ctrl+Z undoes it). Move the `StartAnchor` and `EndAnchor` children to place the ends.
 
 ```gdscript
 # Create a rope
@@ -68,7 +71,7 @@ rope.end_position = Vector2(300, 300)
 
 ## Example Scenes
 
-The plugin includes several example scenes demonstrating different use cases:
+The examples live in `addons/lrd_pixel_rope_physics/examples/`. Open the repo root in Godot to run them; Escape or P opens a menu to switch between them.
 
 | Scene | Description |
 |---|---|
@@ -114,3 +117,9 @@ Made by [Lost Rabbit Digital](https://github.com/Lost-Rabbit-Digital) · [Discor
 - **Elastic System** - [@brinegame.bsky.social](https://bsky.app/profile/brinegame.bsky.social/post/3ljgyh6d5lc2x)
 
 MPL-2.0 — see [LICENSE](LICENSE.md)
+
+---
+
+## AI Disclosure
+
+Parts of this project, including code and documentation, were written with the help of AI tools (such as Claude). All AI-assisted work has been reviewed and tested by a human before release.

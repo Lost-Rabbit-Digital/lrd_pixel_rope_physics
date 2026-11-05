@@ -16,7 +16,7 @@ This guide will help you install PixelRope and set up your first rope simulation
 ### Method 2: Manual Installation
 
 1. Download the plugin from the [GitHub repository](https://github.com/Lost-Rabbit-Digital/pixelated_rope_simulation)
-2. Extract the `addons/pixel_rope` folder into your project's `addons` directory
+2. Extract the `addons/lrd_pixel_rope_physics` folder into your project's `addons` directory
 3. Enable the plugin in Project Settings > Plugins
 
 ## Quick Setup
