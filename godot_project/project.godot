@@ -28,7 +28,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/pixel_rope/plugin.cfg")
+enabled=PackedStringArray("res://addons/lrd_pixel_rope_physics/plugin.cfg")
 
 [rendering]
 

@@ -1,5 +1,5 @@
 @tool
-@icon("res://addons/pixel_rope/icons/CircleShape2D.svg")
+@icon("res://addons/lrd_pixel_rope_physics/icons/CircleShape2D.svg")
 ## An anchor point for PixelRope connections.
 ##
 ## Provides editor-draggable anchor points with collision detection areas.

@@ -2,9 +2,9 @@
 ## PixelRope editor plugin - registers custom node types and handles editor integration.
 extends EditorPlugin
 
-const rope_node_script = preload("res://addons/pixel_rope/scripts/components/rope_node.gd")
-const rope_anchor_script = preload("res://addons/pixel_rope/scripts/components/rope_anchor.gd")
-const rope_creation_tool_script = preload("res://addons/pixel_rope/scripts/editor_tools/rope_creation_button.gd")
+const rope_node_script = preload("res://addons/lrd_pixel_rope_physics/scripts/components/rope_node.gd")
+const rope_anchor_script = preload("res://addons/lrd_pixel_rope_physics/scripts/components/rope_anchor.gd")
+const rope_creation_tool_script = preload("res://addons/lrd_pixel_rope_physics/scripts/editor_tools/rope_creation_button.gd")
 
 var _editor_selection: EditorSelection
 var _selected_rope: PixelRope
@@ -14,9 +14,9 @@ var _rope_creation_tool = null
 
 func _enter_tree() -> void:
 	add_custom_type("PixelRope", "Node2D", rope_node_script,
-		preload("res://addons/pixel_rope/icons/Curve2D.svg"))
+		preload("res://addons/lrd_pixel_rope_physics/icons/Curve2D.svg"))
 	add_custom_type("RopeAnchor", "Node2D", rope_anchor_script,
-		preload("res://addons/pixel_rope/icons/CircleShape2D.svg"))
+		preload("res://addons/lrd_pixel_rope_physics/icons/CircleShape2D.svg"))
 
 	_editor_selection = get_editor_interface().get_selection()
 	_editor_selection.selection_changed.connect(_on_selection_changed)

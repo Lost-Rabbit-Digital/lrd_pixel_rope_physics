@@ -1,14 +1,17 @@
 @tool
-@icon("res://addons/pixel_rope/icons/Curve2D.svg")
+@icon("res://addons/lrd_pixel_rope_physics/icons/Curve2D.svg")
 ## Pixel-perfect rope simulation using Verlet integration.
 ##
-## Verlet integration is the optimal algorithm for rope/chain simulation:
-## it's numerically stable, preserves energy well, and naturally handles
-## constraints through iterative position correction. Each frame:
-## 1. Integrate positions using velocity = current_pos - old_pos (implicit)
-## 2. Apply gravity and damping
-## 3. Iteratively solve distance constraints between adjacent points
-## 4. Resolve collisions with environment
+## Verlet integration with position-based distance constraints. Each frame:
+## 1. Detect collision contacts once (broad query, then one query per point)
+## 2. Split the frame into many small substeps. In each substep:
+##    a. Integrate positions (velocity = current_pos - old_pos)
+##    b. Run one constraint pass, alternating sweep direction
+##    c. Push points out of the cached contact planes
+##
+## Many substeps with one pass each gives a stiffer, less stretchy rope than
+## a few substeps with many passes, at the same cost (Macklin et al. 2019,
+## "Small Steps in Physics Simulation").
 extends Node2D
 class_name PixelRope
 
@@ -53,12 +56,21 @@ enum GrabMode { NONE, ANCHORS_ONLY, ANY_POINT }
 		line_algorithm = v
 		if Engine.is_editor_hint(): queue_redraw()
 
+## Remove L-shaped corner pixels for a clean 1-pixel stroke.
+@export var pixel_perfect: bool = true:
+	set(v):
+		pixel_perfect = v
+		if Engine.is_editor_hint(): queue_redraw()
+
 # --- Physics ---
 @export_group("Physics Properties")
 @export var gravity: Vector2 = Vector2(0, 980)
+## Fraction of velocity kept every 1/60 s. Independent of frame rate and substeps.
 @export_range(0.0, 1.0) var damping: float = 0.98
-@export_range(1, 50) var iterations: int = 10
-@export_range(1, 10) var physics_substeps: int = 3
+## Constraint passes per substep. Prefer raising physics_substeps instead.
+@export_range(1, 50) var iterations: int = 1
+## Substeps per physics frame. More substeps = stiffer, more stable rope.
+@export_range(1, 64) var physics_substeps: int = 20
 @export var max_stretch_factor: float = 2.0
 
 # --- Anchors ---
@@ -132,6 +144,9 @@ var _points: PackedVector2Array = PackedVector2Array()
 var _old_points: PackedVector2Array = PackedVector2Array()
 var _locked: PackedByteArray = PackedByteArray()
 var _masses: PackedFloat32Array = PackedFloat32Array()
+## 1/mass, or 0 for points that must not move (locked or grabbed).
+var _inv_masses: PackedFloat32Array = PackedFloat32Array()
+var _sweep_forward: bool = true
 
 var _start_anchor: Node2D
 var _end_anchor: Node2D
@@ -142,7 +157,17 @@ var _initialized: bool = false
 var _space_state: PhysicsDirectSpaceState2D
 var _collision_shape: CircleShape2D
 var _collision_query: PhysicsShapeQueryParameters2D
-var _collision_contacts: Dictionary = {}
+var _broad_shape: RectangleShape2D
+var _broad_query: PhysicsShapeQueryParameters2D
+# Contact planes found once per frame and reused by every substep.
+var _contact_points: PackedVector2Array = PackedVector2Array()
+var _contact_normals: PackedVector2Array = PackedVector2Array()
+var _has_contact: PackedByteArray = PackedByteArray()
+
+# Rendering buffers, reused every frame to avoid allocations
+var _cells: PackedVector2Array = PackedVector2Array()
+var _tri_points: PackedVector2Array = PackedVector2Array()
+var _line_buffer: PackedVector2Array = PackedVector2Array()
 
 # Interaction
 var _is_dragging: bool = false
@@ -188,6 +213,11 @@ func _init_rope() -> void:
 	_old_points.resize(count)
 	_locked.resize(count)
 	_masses.resize(count)
+	_inv_masses.resize(count)
+	_contact_points.resize(count)
+	_contact_normals.resize(count)
+	_has_contact.resize(count)
+	_has_contact.fill(0)
 
 	var start_pos := _start_anchor.global_position
 	var end_pos := _end_anchor.global_position
@@ -218,8 +248,14 @@ func _init_collisions() -> void:
 
 	_collision_query = PhysicsShapeQueryParameters2D.new()
 	_collision_query.collision_mask = collision_mask
-	_collision_query.margin = 2.0
+	# Wide margin so contacts the point reaches later this frame are found too.
+	_collision_query.margin = collision_radius
 	_collision_query.shape = _collision_shape
+
+	_broad_shape = RectangleShape2D.new()
+	_broad_query = PhysicsShapeQueryParameters2D.new()
+	_broad_query.collision_mask = collision_mask
+	_broad_query.shape = _broad_shape
 
 	var world := get_world_2d()
 	if world:
@@ -293,19 +329,27 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var sub_delta := delta / float(physics_substeps)
+	# Per-substep factors derived from per-1/60s settings, so tuning doesn't
+	# change when the substep count or frame rate changes.
+	var velocity_keep := pow(damping, sub_delta * 60.0)
+	var friction_keep := pow(1.0 - collision_friction, sub_delta * 60.0)
 
-	for _substep in physics_substeps:
-		# Pin non-dynamic anchors to their node positions
-		if not dynamic_start_anchor:
-			_points[0] = _start_anchor.global_position
-		if not dynamic_end_anchor:
-			_points[segment_count] = _end_anchor.global_position
+	_update_inv_masses()
 
-		_verlet_integrate(sub_delta)
+	# Pin non-dynamic anchors to their node positions
+	if not dynamic_start_anchor:
+		_points[0] = _start_anchor.global_position
+	if not dynamic_end_anchor:
+		_points[segment_count] = _end_anchor.global_position
+
+	var colliding := enable_collisions and _detect_collisions()
+
+	for substep in physics_substeps:
+		_verlet_integrate(sub_delta, velocity_keep, substep == 0)
 		_solve_constraints()
 
-		if enable_collisions:
-			_resolve_collisions()
+		if colliding:
+			_resolve_collisions(friction_keep)
 
 	# Sync dynamic anchor nodes to simulation
 	if dynamic_start_anchor:
@@ -317,103 +361,141 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 
-## Verlet integration step: position += velocity * damping + acceleration * dt^2
-## Velocity is implicitly stored as (position - old_position).
-func _verlet_integrate(delta: float) -> void:
-	var dt2 := delta * delta
-
+## Locked and grabbed points get inverse mass 0, so the solver never moves them.
+func _update_inv_masses() -> void:
 	for i in _points.size():
 		if _locked[i] or _grabbed_index == i:
+			_inv_masses[i] = 0.0
+		else:
+			_inv_masses[i] = 1.0 / _masses[i]
+
+
+## Verlet integration step: position += velocity * keep + gravity * dt^2
+## Velocity is implicitly stored as (position - old_position).
+## Gravity is an acceleration, so it does not depend on mass.
+func _verlet_integrate(delta: float, velocity_keep: float, apply_jitter: bool) -> void:
+	var dt2 := delta * delta
+	var g_step := gravity * dt2
+	var anchor_g_step := (anchor_gravity if anchor_gravity != Vector2.ZERO else gravity) * dt2
+
+	for i in _points.size():
+		if _inv_masses[i] == 0.0:
 			continue
 
 		var pos := _points[i]
-		var old := _old_points[i]
-		var velocity := pos - old
+		var velocity := pos - _old_points[i]
+		var is_end := i == 0 or i == segment_count
 
-		# Select gravity (custom for anchors if set)
-		var g := gravity
-		if (i == 0 or i == segment_count) and anchor_gravity != Vector2.ZERO:
-			g = anchor_gravity
-
-		# Anchor jitter
-		if anchor_jitter > 0.0 and (i == 0 or i == segment_count):
+		# Jitter once per frame (not per substep) so its strength
+		# doesn't depend on the substep count.
+		if apply_jitter and is_end and anchor_jitter > 0.0:
 			velocity += Vector2(
 				randf_range(-anchor_jitter, anchor_jitter),
 				randf_range(-anchor_jitter, anchor_jitter)
 			)
 
 		_old_points[i] = pos
-		_points[i] = pos + velocity * damping + g * dt2 / _masses[i]
+		_points[i] = pos + velocity * velocity_keep + (anchor_g_step if is_end else g_step)
 
 
-## Iteratively solve distance constraints between adjacent points.
-## This is the core of rope simulation stability - more iterations = stiffer rope.
+## One or more passes over the distance constraints between adjacent points.
+## Sweep direction alternates every pass so the rope isn't biased toward
+## one end. Corrections are split by inverse mass, so a point next to a fixed
+## anchor takes the whole correction and converges in one pass.
 func _solve_constraints() -> void:
+	var rest := segment_length
 	for _iter in iterations:
-		for i in segment_count:
-			var p1 := _points[i]
-			var p2 := _points[i + 1]
+		var i := 0 if _sweep_forward else segment_count - 1
+		var step := 1 if _sweep_forward else -1
+		_sweep_forward = not _sweep_forward
 
-			var diff := p2 - p1
-			var dist := diff.length()
-			if dist < 0.001:
-				dist = 0.001
-
-			var correction := diff * ((segment_length - dist) / dist)
-
-			var m1 := _masses[i]
-			var m2 := _masses[i + 1]
-			var total_mass := m1 + m2
-
-			if not _locked[i] and _grabbed_index != i:
-				_points[i] = p1 - correction * (m2 / total_mass)
-			if not _locked[i + 1] and _grabbed_index != i + 1:
-				_points[i + 1] = p2 + correction * (m1 / total_mass)
+		for _k in segment_count:
+			var w1 := _inv_masses[i]
+			var w2 := _inv_masses[i + 1]
+			var w := w1 + w2
+			if w > 0.0:
+				var p1 := _points[i]
+				var p2 := _points[i + 1]
+				var diff := p2 - p1
+				var dist := diff.length()
+				if dist > 0.0001:
+					var corr := diff * ((dist - rest) / (dist * w))
+					_points[i] = p1 + corr * w1
+					_points[i + 1] = p2 - corr * w2
+			i += step
 
 
 # ==========================================================================
 # Collision Detection
 # ==========================================================================
 
-func _resolve_collisions() -> void:
+## Finds contact planes once per frame. A single broad query over the rope's
+## bounding box skips all per-point queries while the rope is in open air.
+## Returns true if any point has a contact to resolve this frame.
+func _detect_collisions() -> bool:
 	if not _space_state:
 		var world := get_world_2d()
-		if world:
-			_space_state = world.direct_space_state
-		else:
-			return
+		if not world:
+			return false
+		_space_state = world.direct_space_state
 
-	if not _collision_query:
-		return
+	if not _collision_query or not _broad_query:
+		return false
 
-	_collision_contacts.clear()
+	_has_contact.fill(0)
 
+	# Broad phase: one box covering the whole rope plus how far it can move.
+	var bounds := Rect2(_points[0], Vector2.ZERO)
+	var max_speed := 0.0
 	for i in _points.size():
-		if _locked[i] or _grabbed_index == i:
+		bounds = bounds.expand(_points[i])
+		max_speed = maxf(max_speed, (_points[i] - _old_points[i]).length_squared())
+	var pad := collision_radius * 2.0 + sqrt(max_speed) * 2.0
+	bounds = bounds.grow(pad)
+	_broad_shape.size = bounds.size
+	_broad_query.transform = Transform2D(0.0, bounds.get_center())
+	if _space_state.intersect_shape(_broad_query, 1).is_empty():
+		return false
+
+	# Narrow phase: one rest-info query per movable point.
+	var found := false
+	for i in _points.size():
+		if _inv_masses[i] == 0.0:
 			continue
-
-		_collision_query.transform = Transform2D(0, _points[i])
-
+		_collision_query.transform = Transform2D(0.0, _points[i])
 		var info := _space_state.get_rest_info(_collision_query)
-		if info.is_empty() or not info.has("point") or not info.has("normal"):
+		if info.is_empty():
+			continue
+		_contact_points[i] = info["point"]
+		_contact_normals[i] = info["normal"]
+		_has_contact[i] = 1
+		found = true
+	return found
+
+
+## Pushes points out of their cached contact planes. Runs every substep.
+func _resolve_collisions(friction_keep: float) -> void:
+	for i in _points.size():
+		if not _has_contact[i] or _inv_masses[i] == 0.0:
 			continue
 
-		var contact: Vector2 = info["point"]
-		var normal: Vector2 = info["normal"]
-		_collision_contacts[i] = {"position": contact, "normal": normal}
+		var n := _contact_normals[i]
+		var p := _points[i]
+		var depth := collision_radius - (p - _contact_points[i]).dot(n)
+		if depth <= 0.0:
+			continue
 
-		var penetration := collision_radius - (_points[i] - contact).length()
-		if penetration > 0:
-			var movement := _points[i] - _old_points[i]
-			var reflection := movement.bounce(normal) * collision_bounce
+		# Split velocity into normal and tangent parts before the push-out,
+		# so the correction itself doesn't turn into extra bounce.
+		var vel := p - _old_points[i]
+		var vn := vel.dot(n)
+		var vt := vel - n * vn
+		if vn < 0.0:
+			vn = -vn * collision_bounce
 
-			# Apply friction to tangent component
-			var normal_comp := normal * reflection.dot(normal)
-			var tangent_comp := (reflection - normal_comp) * (1.0 - collision_friction)
-			var final_vel := normal_comp + tangent_comp
-
-			_points[i] = contact + normal * (collision_radius + 0.1)
-			_old_points[i] = _points[i] - final_vel
+		p += n * depth
+		_points[i] = p
+		_old_points[i] = p - (vt * friction_keep + n * vn)
 
 
 # ==========================================================================
@@ -540,36 +622,66 @@ func _draw() -> void:
 		return
 
 	if _state == RopeState.BROKEN:
-		var s := to_local(_start_anchor.global_position)
-		var e := to_local(_end_anchor.global_position)
-		_draw_pixelated_line(s, e, Color.RED)
+		_draw_straight(_start_anchor.global_position, _end_anchor.global_position, Color.RED)
 	else:
 		var color := Color.DARK_ORANGE if _state == RopeState.STRETCHED else rope_color
-		for i in _points.size() - 1:
-			_draw_pixelated_line(to_local(_points[i]), to_local(_points[i + 1]), color)
+		_draw_pixel_path(_points, color)
 
 	if enable_collisions and show_collision_debug:
 		_draw_collision_debug()
 
 
 func _draw_editor_preview() -> void:
-	var s: Vector2
-	var e: Vector2
 	if _start_anchor and _end_anchor:
-		s = to_local(_start_anchor.global_position)
-		e = to_local(_end_anchor.global_position)
+		_draw_straight(_start_anchor.global_position, _end_anchor.global_position, rope_color)
 	else:
-		s = start_position
-		e = end_position
-	_draw_pixelated_line(s, e, rope_color)
+		_draw_straight(to_global(start_position), to_global(end_position), rope_color)
 
 
-func _draw_pixelated_line(from: Vector2, to: Vector2, color: Color) -> void:
-	var pts := LineAlgorithms.get_line_points(from, to, pixel_size, line_algorithm, pixel_spacing)
-	var half := Vector2(pixel_size / 2.0, pixel_size / 2.0)
-	var size := Vector2(pixel_size, pixel_size)
-	for pt in pts:
-		draw_rect(Rect2(pt - half, size), color)
+func _draw_straight(from_global: Vector2, to_global_pos: Vector2, color: Color) -> void:
+	_line_buffer.resize(2)
+	_line_buffer[0] = from_global
+	_line_buffer[1] = to_global_pos
+	_draw_pixel_path(_line_buffer, color)
+
+
+## Rasterizes the whole rope as one pixel path on a world-aligned grid
+## (so pixels don't shimmer when the node moves) and submits every pixel
+## in a single draw call.
+func _draw_pixel_path(global_points: PackedVector2Array, color: Color) -> void:
+	var ps := maxi(pixel_size, 1)
+	LineAlgorithms.rasterize_path(global_points, ps, line_algorithm, pixel_perfect, _cells)
+	if _cells.is_empty():
+		return
+
+	var step := pixel_spacing + 1
+	var count := ceili(float(_cells.size()) / float(step))
+	_tri_points.resize(count * 6)
+
+	var size := float(ps)
+	var right := Vector2(size, 0.0)
+	var down := Vector2(0.0, size)
+	var k := 0
+	var j := 0
+	while j < _cells.size():
+		var a := _cells[j] * size
+		var b := a + right
+		var c := b + down
+		var d := a + down
+		_tri_points[k] = a
+		_tri_points[k + 1] = b
+		_tri_points[k + 2] = c
+		_tri_points[k + 3] = a
+		_tri_points[k + 4] = c
+		_tri_points[k + 5] = d
+		k += 6
+		j += step
+
+	# Cells are in global space; undo this node's transform while drawing them.
+	draw_set_transform_matrix(get_global_transform().affine_inverse())
+	RenderingServer.canvas_item_add_triangle_array(
+		get_canvas_item(), PackedInt32Array(), _tri_points, PackedColorArray([color]))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 func _draw_collision_debug() -> void:
@@ -578,11 +690,10 @@ func _draw_collision_debug() -> void:
 		var pos := to_local(_points[i])
 		draw_circle(pos, collision_radius, debug_color)
 
-		if _collision_contacts.has(i):
-			var data: Dictionary = _collision_contacts[i]
-			var contact := to_local(data["position"])
+		if _has_contact.size() > i and _has_contact[i]:
+			var contact := to_local(_contact_points[i])
 			draw_circle(contact, 2.0, Color.RED)
-			draw_line(contact, contact + data["normal"] * 10.0, Color.GREEN, 1.0)
+			draw_line(contact, contact + _contact_normals[i] * 10.0, Color.GREEN, 1.0)
 
 
 # ==========================================================================

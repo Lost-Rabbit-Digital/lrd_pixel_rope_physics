@@ -6,7 +6,7 @@ const DISABLED_TOOLTIP := "DISABLED: Enable to spawn rope nodes on click"
 const ENABLED_TOOLTIP := "ENABLED: Currently spawning pixel rope nodes"
 const DISABLED_COLOR := Color(1.0, 0.5, 0.5)
 const ENABLED_COLOR := Color(0.5, 1.0, 0.5)
-const RopeScene = preload("res://addons/pixel_rope/examples/basic_ropes/basic_rope_demo.tscn")
+const RopeScene = preload("res://addons/lrd_pixel_rope_physics/examples/basic_ropes/basic_rope_demo.tscn")
 
 var rope_button: Button
 var is_rope_creating_mode: bool = false
@@ -24,7 +24,7 @@ func initialize(parent_plugin: EditorPlugin, editor_selection: EditorSelection) 
 	rope_button.toggle_mode = false
 	rope_button.tooltip_text = DISABLED_TOOLTIP
 	rope_button.modulate = DISABLED_COLOR
-	rope_button.icon = preload("res://addons/pixel_rope/icons/Curve2D.svg")
+	rope_button.icon = preload("res://addons/lrd_pixel_rope_physics/icons/Curve2D.svg")
 	rope_button.pressed.connect(_on_rope_button_pressed)
 
 	plugin_root.add_control_to_container(EditorPlugin.CONTAINER_CANVAS_EDITOR_MENU, rope_button)

@@ -34,11 +34,11 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.4, featurin
 
 ### Manual
 
-1. Copy `addons/pixel_rope/` into your project:
+1. Copy `addons/lrd_pixel_rope_physics/` into your project:
    ```
    your_project/
    └── addons/
-       └── pixel_rope/
+       └── lrd_pixel_rope_physics/
    ```
 2. **Project → Project Settings → Plugins** → enable **PixelRope**
 
