@@ -25,14 +25,6 @@ A high-performance, pixel-perfect rope simulation plugin for Godot 4.7+, featuri
 
 ## Install
 
-### Asset Library (recommended)
-
-1. Open your project → **AssetLib** → search **"PixelRope"**
-2. **Download** → **Install**
-3. **Project → Project Settings → Plugins** → enable **PixelRope**
-
-### Manual
-
 1. Copy `addons/pixel_rope/` into your project:
    ```
    your_project/
