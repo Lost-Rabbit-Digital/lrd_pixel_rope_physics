@@ -1,12 +1,12 @@
 @tool
-@icon("res://addons/pixel_rope/icons/CircleShape2D.svg")
-## An anchor point for PixelRope connections.
-##
-## Provides editor-draggable anchor points with collision detection areas.
-## Notifies the parent rope when position changes.
+@icon("res://addons/lrd_pixel_rope_physics/icons/CircleShape2D.svg")
 class_name RopeAnchor
 extends Node2D
+## One end of a [code]PixelRope[/code], made by the rope as [code]StartAnchor[/code] and
+## [code]EndAnchor[/code]. Carries an [Area2D] so other nodes can detect the rope's ends. Move it
+## with the editor's move tool; the parent rope follows.
 
+## Emitted in the editor when the anchor is moved.
 signal position_changed
 
 @export var radius: float = 8.0:
@@ -25,8 +25,6 @@ signal position_changed
 		_update_debug()
 
 var _is_editor: bool = false
-var _dragging: bool = false
-var _drag_offset: Vector2
 var _last_position: Vector2
 
 
@@ -34,6 +32,8 @@ func _ready() -> void:
 	_is_editor = Engine.is_editor_hint()
 	_last_position = position
 	_ensure_collision_area()
+	if _is_editor:
+		set_notify_transform(true)
 
 
 func _ensure_collision_area() -> void:
@@ -81,35 +81,9 @@ func _get_collision() -> CollisionShape2D:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_TRANSFORM_CHANGED:
-		if _is_editor and position != _last_position and not _dragging:
-			_last_position = position
-			_notify_parent()
-
-
-func _input(event: InputEvent) -> void:
-	if not _is_editor:
-		return
-
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var mouse: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
-
-		if event.pressed:
-			if mouse.distance_to(global_position) <= radius:
-				_dragging = true
-				_drag_offset = global_position - mouse
-				get_viewport().set_input_as_handled()
-		elif _dragging:
-			_dragging = false
-			_notify_parent()
-			get_viewport().set_input_as_handled()
-
-	elif event is InputEventMouseMotion and _dragging:
-		var mouse: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
-		global_position = mouse + _drag_offset
+	if what == NOTIFICATION_TRANSFORM_CHANGED and _is_editor and position != _last_position:
 		_last_position = position
 		_notify_parent()
-		get_viewport().set_input_as_handled()
 
 
 func _notify_parent() -> void:

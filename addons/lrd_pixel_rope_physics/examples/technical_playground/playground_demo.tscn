@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cajmndxdqyxho"]
 
-[ext_resource type="Script" uid="uid://4kshuq8vtrsw" path="res://addons/lrd_pixel_rope_physics/scripts/components/rope_node.gd" id="1_r5g3e"]
-[ext_resource type="Script" uid="uid://n6l6bwfnbar6" path="res://addons/lrd_pixel_rope_physics/scripts/components/rope_anchor.gd" id="2_i6t6t"]
+[ext_resource type="Script" uid="uid://4kshuq8vtrsw" path="res://addons/lrd_pixel_rope_physics/pixel_rope.gd" id="1_r5g3e"]
+[ext_resource type="Script" uid="uid://n6l6bwfnbar6" path="res://addons/lrd_pixel_rope_physics/rope_anchor.gd" id="2_i6t6t"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_jndiu"]
 radius = 8.0
