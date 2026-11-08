@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-godot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot 4.x
+        uses: chickensoft-games/setup-godot@v1
+        with:
+          version: 4.7.0
+          use-dotnet: false
+
+      - name: Import Godot Assets
+        run: godot --headless --import
+
+      - name: Run GDUnit4 Tests
+        run: |
+          godot --headless -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests/unit --ignoreHeadlessMode -c

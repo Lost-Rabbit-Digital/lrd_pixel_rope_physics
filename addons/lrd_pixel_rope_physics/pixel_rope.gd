@@ -26,18 +26,26 @@ signal rope_grabbed(segment_index: int)
 signal rope_released
 
 enum RopeState { NORMAL, STRETCHED, BROKEN }
+
+const MIN_SEGMENT_LENGTH := 0.01
 enum GrabMode { NONE, ANCHORS_ONLY, ANY_POINT }
 
 # --- Rope Properties ---
 @export_group("Rope Properties")
+## Number of segments. Changing it at runtime resamples the current rope shape, so it can be
+## animated (e.g. a winch) without the rope snapping straight.
 @export var segment_count: int = 100:
 	set(v):
+		v = maxi(v, 1)
+		if v == segment_count:
+			return
 		segment_count = v
+		if _initialized: _resample_rope(v)
 		if Engine.is_editor_hint(): queue_redraw()
 
 @export var segment_length: float = 5.0:
 	set(v):
-		segment_length = v
+		segment_length = maxf(v, MIN_SEGMENT_LENGTH)
 		if Engine.is_editor_hint(): queue_redraw()
 
 @export var rope_color: Color = Color(0.8, 0.6, 0.2):
@@ -76,7 +84,9 @@ enum GrabMode { NONE, ANCHORS_ONLY, ANY_POINT }
 ## Constraint passes per substep. Prefer raising physics_substeps instead.
 @export_range(1, 50) var iterations: int = 1
 ## Substeps per physics frame. More substeps = stiffer, more stable rope.
-@export_range(1, 64) var physics_substeps: int = 20
+@export_range(1, 64) var physics_substeps: int = 20:
+	set(v):
+		physics_substeps = maxi(v, 1)
 @export var max_stretch_factor: float = 2.0
 
 # --- Anchors ---
@@ -113,12 +123,12 @@ enum GrabMode { NONE, ANCHORS_ONLY, ANY_POINT }
 @export var dynamic_start_anchor: bool = false:
 	set(v):
 		dynamic_start_anchor = v
-		if _points.size() > 0: _locked[0] = not v
+		if _locked.size() > 0: _locked[0] = 0 if v else 1
 
 @export var dynamic_end_anchor: bool = true:
 	set(v):
 		dynamic_end_anchor = v
-		if _points.size() > segment_count: _locked[segment_count] = not v
+		if _locked.size() > segment_count: _locked[segment_count] = 0 if v else 1
 
 @export_range(0.1, 10.0) var anchor_mass: float = 1.0
 @export var anchor_jitter: float = 0.0
@@ -153,6 +163,8 @@ var _masses: PackedFloat32Array = PackedFloat32Array()
 ## 1/mass, or 0 for points that must not move (locked or grabbed).
 var _inv_masses: PackedFloat32Array = PackedFloat32Array()
 var _sweep_forward: bool = true
+## Substep length used last frame; velocities are rescaled when it changes.
+var _prev_sub_delta: float = 0.0
 
 var _start_anchor: Node2D
 var _end_anchor: Node2D
@@ -243,6 +255,47 @@ func _init_rope() -> void:
 			_locked[i] = 0
 
 	_state = RopeState.NORMAL
+	_prev_sub_delta = 0.0
+
+
+## Rebuilds the point arrays for [param new_segments] segments by resampling the current
+## shape (positions and velocities), so changing [member segment_count] mid-simulation keeps
+## the rope where it is instead of indexing past the end of the old arrays.
+func _resample_rope(new_segments: int) -> void:
+	var old_count := _points.size()
+	if old_count < 2:
+		_init_rope()
+		return
+
+	var src := _points.duplicate()
+	var src_old := _old_points.duplicate()
+	var count := new_segments + 1
+	_points.resize(count)
+	_old_points.resize(count)
+	_locked.resize(count)
+	_masses.resize(count)
+	_inv_masses.resize(count)
+	_contact_points.resize(count)
+	_contact_normals.resize(count)
+	_has_contact.resize(count)
+	_has_contact.fill(0)
+
+	var ratio := float(old_count - 1) / float(new_segments)
+	for i in count:
+		var t := float(i) * ratio
+		var a := mini(int(t), old_count - 2)
+		var f := t - float(a)
+		_points[i] = src[a].lerp(src[a + 1], f)
+		_old_points[i] = src_old[a].lerp(src_old[a + 1], f)
+		_masses[i] = anchor_mass if (i == 0 or i == new_segments) else 1.0
+		if i == 0:
+			_locked[i] = 0 if dynamic_start_anchor else 1
+		elif i == new_segments:
+			_locked[i] = 0 if dynamic_end_anchor else 1
+		else:
+			_locked[i] = 0
+	if _grabbed_index >= count:
+		_release_grab()
 
 
 func _init_collisions() -> void:
@@ -334,7 +387,20 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
+	# Engine.time_scale = 0 gives delta 0. Verlet keeps velocity as a per-step displacement,
+	# so integrating anyway would keep the rope moving while time is frozen.
+	if delta <= 0.0:
+		queue_redraw()
+		return
+
 	var sub_delta := delta / float(physics_substeps)
+	# Verlet stores velocity as displacement per substep. When the substep length changes
+	# (physics tick rate, Engine.time_scale, physics_substeps), rescale that displacement so
+	# the rope keeps its real velocity instead of suddenly speeding up or slowing down.
+	if _prev_sub_delta > 0.0 and not is_equal_approx(sub_delta, _prev_sub_delta):
+		_rescale_velocities(sub_delta / _prev_sub_delta)
+	_prev_sub_delta = sub_delta
+
 	# Per-substep factors derived from per-1/60s settings, so tuning doesn't
 	# change when the substep count or frame rate changes.
 	var velocity_keep := pow(damping, sub_delta * 60.0)
@@ -357,6 +423,14 @@ func _physics_process(delta: float) -> void:
 		if colliding:
 			_resolve_collisions(friction_keep)
 
+	# One NaN or inf (e.g. from extreme settings) would otherwise poison the rope for good.
+	# Checked before the anchor sync so dynamic anchors keep their last good position.
+	if not _all_points_finite():
+		push_warning("PixelRope '%s': simulation became non-finite; resetting the rope." % name)
+		_init_rope()
+		queue_redraw()
+		return
+
 	# Sync dynamic anchor nodes to simulation
 	if dynamic_start_anchor:
 		_start_anchor.global_position = _points[0]
@@ -365,6 +439,18 @@ func _physics_process(delta: float) -> void:
 
 	_check_rope_state()
 	queue_redraw()
+
+
+func _all_points_finite() -> bool:
+	for p in _points:
+		if not p.is_finite():
+			return false
+	return true
+
+
+func _rescale_velocities(ratio: float) -> void:
+	for i in _points.size():
+		_old_points[i] = _points[i] - (_points[i] - _old_points[i]) * ratio
 
 
 ## Locked and grabbed points get inverse mass 0, so the solver never moves them.
@@ -523,7 +609,9 @@ func _handle_dragging() -> void:
 		_points[segment_count] = mouse_pos
 
 
-func _input(event: InputEvent) -> void:
+## Unhandled input, so clicks on UI don't grab the rope underneath. A successful grab marks the
+## click handled, so overlapping ropes don't all grab on the same click.
+func _unhandled_input(event: InputEvent) -> void:
 	if _editor_mode or not _initialized:
 		return
 
@@ -531,14 +619,16 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if event.pressed:
-		_try_grab(get_global_mouse_position())
-	else:
+		if _try_grab(get_global_mouse_position()):
+			get_viewport().set_input_as_handled()
+	elif _is_dragging:
 		_release_grab()
 
 
-func _try_grab(mouse_pos: Vector2) -> void:
+## Returns true if the rope (or its end anchor) was grabbed.
+func _try_grab(mouse_pos: Vector2) -> bool:
 	if interaction_mode == GrabMode.NONE:
-		return
+		return false
 
 	var best_index := -1
 	var best_dist := interaction_width
@@ -568,6 +658,7 @@ func _try_grab(mouse_pos: Vector2) -> void:
 		_grabbed_index = best_index
 		_grab_offset = _points[best_index] - mouse_pos
 		rope_grabbed.emit(best_index)
+	return _is_dragging
 
 
 func _release_grab() -> void:

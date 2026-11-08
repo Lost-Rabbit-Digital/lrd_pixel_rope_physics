@@ -11,6 +11,10 @@ enum LineAlgorithmType {
 	DDA        ## Floating-point based, visually smoother
 }
 
+## Longest single segment, in cells, that rasterize_path will walk. Longer jumps (a point that
+## flew off to infinity) are drawn as their end cell only, so a bad frame can't hang the game.
+const MAX_SEGMENT_CELLS := 4096
+
 
 static func get_line_points(
 	from_point: Vector2,
@@ -92,12 +96,27 @@ static func rasterize_path(
 		return
 
 	var ps := float(maxi(pixel_size, 1))
-	var prev := Vector2i((points[0] / ps).floor())
+	var start := 0
+	while start < points.size() and not points[start].is_finite():
+		start += 1
+	if start == points.size():
+		return
+	var prev := Vector2i((points[start] / ps).floor())
 	_push_cell(out, prev, pixel_perfect)
 
-	for i in range(1, points.size()):
-		var cell := Vector2i((points[i] / ps).floor())
+	for i in range(start + 1, points.size()):
+		if not points[i].is_finite():
+			continue
+		var fcell := (points[i] / ps).floor()
+		var cell := Vector2i(fcell)
 		if cell == prev:
+			continue
+		# A runaway point must not stall the frame walking millions of cells. Measured in
+		# floats because a huge coordinate overflows Vector2i.
+		var span := (fcell - Vector2(prev)).abs()
+		if maxf(span.x, span.y) > MAX_SEGMENT_CELLS:
+			_push_cell(out, cell, pixel_perfect)
+			prev = cell
 			continue
 		if algorithm_type == LineAlgorithmType.DDA:
 			_walk_dda(prev, cell, out, pixel_perfect)
