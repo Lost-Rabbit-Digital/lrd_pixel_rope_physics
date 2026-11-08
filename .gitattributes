@@ -14,3 +14,5 @@
 /plugin_icon.png export-ignore
 /plugin_icon.png.import export-ignore
 /project.godot export-ignore
+/tests export-ignore
+/addons/gdUnit4 export-ignore
