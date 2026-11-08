@@ -609,7 +609,9 @@ func _handle_dragging() -> void:
 		_points[segment_count] = mouse_pos
 
 
-func _input(event: InputEvent) -> void:
+## Unhandled input, so clicks on UI don't grab the rope underneath. A successful grab marks the
+## click handled, so overlapping ropes don't all grab on the same click.
+func _unhandled_input(event: InputEvent) -> void:
 	if _editor_mode or not _initialized:
 		return
 
@@ -617,14 +619,16 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if event.pressed:
-		_try_grab(get_global_mouse_position())
-	else:
+		if _try_grab(get_global_mouse_position()):
+			get_viewport().set_input_as_handled()
+	elif _is_dragging:
 		_release_grab()
 
 
-func _try_grab(mouse_pos: Vector2) -> void:
+## Returns true if the rope (or its end anchor) was grabbed.
+func _try_grab(mouse_pos: Vector2) -> bool:
 	if interaction_mode == GrabMode.NONE:
-		return
+		return false
 
 	var best_index := -1
 	var best_dist := interaction_width
@@ -654,6 +658,7 @@ func _try_grab(mouse_pos: Vector2) -> void:
 		_grabbed_index = best_index
 		_grab_offset = _points[best_index] - mouse_pos
 		rope_grabbed.emit(best_index)
+	return _is_dragging
 
 
 func _release_grab() -> void:

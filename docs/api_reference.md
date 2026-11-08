@@ -26,7 +26,7 @@ This document provides a complete reference for all classes, properties, methods
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `segment_count` | int | 100 | Number of segments in the rope |
+| `segment_count` | int | 100 | Number of segments in the rope (min 1). Changing it at runtime resamples the current shape. |
 | `segment_length` | float | 5.0 | Length of each segment in pixels |
 | `rope_color` | Color | Color(0.8, 0.6, 0.2) | Color of the rope |
 
@@ -87,6 +87,8 @@ This document provides a complete reference for all classes, properties, methods
 | `interaction_mode` | GrabMode | ANY_POINT | How rope can be interacted with |
 | `interaction_width` | float | 20.0 | Width of interaction area |
 | `grab_strength` | float | 0.8 | Pull strength for grabbed segments |
+
+Grabbing uses `_unhandled_input`: clicks consumed by UI never grab a rope, and a successful grab marks the click handled so only one rope grabs per click.
 | `end_anchor_draggable` | bool | true | Allow dragging the end anchor |
 
 ### Methods
