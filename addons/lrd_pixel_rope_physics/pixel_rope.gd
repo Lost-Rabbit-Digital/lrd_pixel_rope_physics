@@ -353,6 +353,16 @@ func _get_or_create_anchor(anchor_name: String, pos: Vector2) -> Node2D:
 	return anchor
 
 
+## Recreates an anchor node that was freed at runtime (e.g. queue_free() on
+## StartAnchor/EndAnchor) at the rope's current end point, instead of crashing
+## on a freed-instance access in the simulation or draw code.
+func _restore_missing_anchors() -> void:
+	if not is_instance_valid(_start_anchor):
+		_start_anchor = _get_or_create_anchor("StartAnchor", to_local(_points[0]))
+	if not is_instance_valid(_end_anchor):
+		_end_anchor = _get_or_create_anchor("EndAnchor", to_local(_points[segment_count]))
+
+
 func _sync_anchor_properties() -> void:
 	for anchor in [_start_anchor, _end_anchor]:
 		if anchor and anchor is RopeAnchor:
@@ -381,6 +391,7 @@ func _physics_process(delta: float) -> void:
 	if not _initialized or _points.is_empty():
 		return
 
+	_restore_missing_anchors()
 	_handle_dragging()
 
 	if _state == RopeState.BROKEN:
@@ -727,9 +738,9 @@ func _draw() -> void:
 	if _points.is_empty():
 		return
 
-	if _state == RopeState.BROKEN:
+	if _state == RopeState.BROKEN and is_instance_valid(_start_anchor) and is_instance_valid(_end_anchor):
 		_draw_straight(_start_anchor.global_position, _end_anchor.global_position, Color.RED)
-	else:
+	elif _state != RopeState.BROKEN:
 		var color := Color.DARK_ORANGE if _state == RopeState.STRETCHED else rope_color
 		_draw_pixel_path(_points, color)
 

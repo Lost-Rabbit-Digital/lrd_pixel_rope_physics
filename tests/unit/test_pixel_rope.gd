@@ -168,3 +168,16 @@ func test_release_elsewhere_does_not_reset_a_broken_rope() -> void:
 	rope.break_rope()
 	_click(rope, false)
 	assert_int(rope.get_state()).is_equal(PixelRope.RopeState.BROKEN)
+
+
+func test_freed_anchor_is_recreated_at_rope_end() -> void:
+	var rope := _make_rope(4, 10.0)
+	rope.dynamic_end_anchor = true
+	rope._locked[4] = 0
+	var old_end: Node2D = rope._end_anchor
+	rope.remove_child(old_end)
+	old_end.free()
+	_step(rope, 1.0 / 60.0, 3)
+	assert_bool(is_instance_valid(rope._end_anchor)).is_true()
+	assert_object(rope.get_node_or_null("EndAnchor")).is_same(rope._end_anchor)
+	assert_vector(rope._end_anchor.global_position).is_equal_approx(rope._points[4], Vector2(0.01, 0.01))
