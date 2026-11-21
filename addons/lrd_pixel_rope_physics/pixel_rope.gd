@@ -531,8 +531,17 @@ func _detect_collisions() -> bool:
 			return false
 		_space_state = world.direct_space_state
 
+	# Built lazily so enabling collisions at runtime works even if they were off at _ready().
 	if not _collision_query or not _broad_query:
-		return false
+		_init_collisions()
+		if not _collision_query or not _broad_query:
+			return false
+
+	# Apply runtime edits to collision_mask / collision_radius; the queries copy them.
+	_collision_shape.radius = collision_radius
+	_collision_query.margin = collision_radius
+	_collision_query.collision_mask = collision_mask
+	_broad_query.collision_mask = collision_mask
 
 	_has_contact.fill(0)
 
